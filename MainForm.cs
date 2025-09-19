@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MongoDB.Driver;
@@ -13,10 +12,6 @@ namespace MongoDbTools
 {
     public partial class MainForm : Form
     {
-        [DllImport("user32.dll")]
-        public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-        [DllImport("user32.dll")]
-        public static extern bool ReleaseCapture();
 
         private TabControl tabControl;
         private TabPage tabBackup, tabRestore;
@@ -27,6 +22,7 @@ namespace MongoDbTools
         private ProgressBar progressBarBackup;
         private TextBox txtLogBackup;
         private Label lblStatusBackup;
+        private ComboBox cmbBackupAuthMechanism;
         
         // Restore controls  
         private TextBox txtRestoreConnectionString, txtRestoreDatabaseName, txtRestoreFolder;
@@ -35,6 +31,7 @@ namespace MongoDbTools
         private TextBox txtLogRestore;
         private Label lblStatusRestore;
         private CheckBox chkDropExisting;
+        private ComboBox cmbRestoreAuthMechanism;
 
         public MainForm()
         {
@@ -47,27 +44,24 @@ namespace MongoDbTools
             this.Text = "MongoDB Tools";
             this.Size = new System.Drawing.Size(1000, 750);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.None;
-            this.BackColor = System.Drawing.Color.FromArgb(240, 240, 240);
-            this.MaximizeBox = false;
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.BackColor = System.Drawing.SystemColors.Control;
+            this.MaximizeBox = true;
             this.MinimizeBox = true;
+            this.Icon = SystemIcons.Application;
 
-            // Add custom title bar
-            CreateTitleBar();
-
-            // Tab Control with modern styling
+            // Tab Control with classic styling
             tabControl = new TabControl
             {
-                Location = new System.Drawing.Point(10, 42),
-                Size = new System.Drawing.Size(980, 678),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular),
-                BackColor = System.Drawing.Color.FromArgb(255, 255, 255),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                DrawMode = TabDrawMode.OwnerDrawFixed,
-                ItemSize = new System.Drawing.Size(200, 32),
+                Location = new System.Drawing.Point(10, 10),
+                Size = new System.Drawing.Size(980, 710),
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular),
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                DrawMode = TabDrawMode.Normal,
+                ItemSize = new System.Drawing.Size(200, 21),
                 SizeMode = TabSizeMode.Fixed
             };
-            tabControl.DrawItem += TabControl_DrawItem;
 
             // Create tabs
             CreateBackupTab();
@@ -76,94 +70,19 @@ namespace MongoDbTools
             this.Controls.Add(tabControl);
         }
 
-        private void CreateTitleBar()
-        {
-            var titleBar = new Panel
-            {
-                Location = new System.Drawing.Point(0, 0),
-                Size = new System.Drawing.Size(1000, 32),
-                BackColor = System.Drawing.Color.FromArgb(0, 120, 215)
-            };
-
-            var titleLabel = new Label
-            {
-                Text = "MongoDB Tools",
-                Location = new System.Drawing.Point(12, 8),
-                Size = new System.Drawing.Size(400, 16),
-                ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 10, System.Drawing.FontStyle.Regular),
-                BackColor = System.Drawing.Color.Transparent
-            };
-
-            var closeButton = new Button
-            {
-                Text = "✕",
-                Location = new System.Drawing.Point(960, 4),
-                Size = new System.Drawing.Size(24, 24),
-                BackColor = System.Drawing.Color.FromArgb(232, 17, 35),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 8, System.Drawing.FontStyle.Bold)
-            };
-            closeButton.FlatAppearance.BorderSize = 0;
-            closeButton.Click += (s, e) => this.Close();
-
-            var minimizeButton = new Button
-            {
-                Text = "—",
-                Location = new System.Drawing.Point(936, 4),
-                Size = new System.Drawing.Size(24, 24),
-                BackColor = System.Drawing.Color.FromArgb(60, 60, 65),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 8, System.Drawing.FontStyle.Bold)
-            };
-            minimizeButton.FlatAppearance.BorderSize = 0;
-            minimizeButton.Click += (s, e) => this.WindowState = FormWindowState.Minimized;
-
-            titleBar.Controls.AddRange(new Control[] { titleLabel, minimizeButton, closeButton });
-            this.Controls.Add(titleBar);
-
-            // Make title bar draggable
-            titleBar.MouseDown += (s, e) => {
-                if (e.Button == MouseButtons.Left)
-                {
-                    ReleaseCapture();
-                    SendMessage(Handle, 0x112, 0xf012, 0);
-                }
-            };
-        }
-
-        private void TabControl_DrawItem(object sender, DrawItemEventArgs e)
-        {
-            var tabControl = sender as TabControl;
-            var tabPage = tabControl.TabPages[e.Index];
-            var tabRect = tabControl.GetTabRect(e.Index);
-
-            var isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-            var backColor = isSelected ? System.Drawing.Color.FromArgb(0, 120, 215) : System.Drawing.Color.FromArgb(240, 240, 240);
-            var textColor = isSelected ? System.Drawing.Color.White : System.Drawing.Color.FromArgb(64, 64, 64);
-
-            using (var brush = new System.Drawing.SolidBrush(backColor))
-            {
-                e.Graphics.FillRectangle(brush, tabRect);
-            }
-
-            var textRect = new System.Drawing.Rectangle(tabRect.X + 5, tabRect.Y + 8, tabRect.Width - 10, tabRect.Height - 16);
-            TextRenderer.DrawText(e.Graphics, tabPage.Text, tabPage.Font, textRect, textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        }
 
         private void CreateBackupTab()
         {
             tabBackup = new TabPage("Backup Database");
-            tabBackup.BackColor = System.Drawing.Color.FromArgb(255, 255, 255);
+            tabBackup.BackColor = System.Drawing.SystemColors.Control;
             
             // Header Panel
             var headerPanel = new Panel
             {
                 Location = new System.Drawing.Point(15, 15),
                 Size = new System.Drawing.Size(950, 28),
-                BackColor = System.Drawing.Color.FromArgb(0, 120, 215)
+                BackColor = System.Drawing.SystemColors.ActiveCaption,
+                BorderStyle = BorderStyle.Fixed3D
             };
             
             var headerLabel = new Label
@@ -171,8 +90,8 @@ namespace MongoDbTools
                 Text = "Backup MongoDB Database",
                 Location = new System.Drawing.Point(12, 6),
                 Size = new System.Drawing.Size(400, 16),
-                ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 10, System.Drawing.FontStyle.Regular),
+                ForeColor = System.Drawing.SystemColors.ActiveCaptionText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Bold),
                 BackColor = System.Drawing.Color.Transparent
             };
             headerPanel.Controls.Add(headerLabel);
@@ -183,8 +102,8 @@ namespace MongoDbTools
                 Text = "Connection String:", 
                 Location = new System.Drawing.Point(15, 55), 
                 Size = new System.Drawing.Size(120, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtBackupConnectionString = new TextBox 
             { 
@@ -192,10 +111,10 @@ namespace MongoDbTools
                 Size = new System.Drawing.Size(720, 20), 
                 Multiline = true, 
                 Height = 40,
-                BackColor = System.Drawing.Color.White,
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new System.Drawing.Font("Consolas", 8)
+                BackColor = System.Drawing.SystemColors.Window,
+                ForeColor = System.Drawing.SystemColors.WindowText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Font = new System.Drawing.Font("Courier New", 8.25F)
             };
             
             // Add tooltip for connection string format
@@ -205,7 +124,9 @@ namespace MongoDbTools
                 "• Local: mongodb://localhost:27017\n" +
                 "• With Auth: mongodb://username:password@host:port/database\n" +
                 "• Atlas: mongodb+srv://username:password@cluster.mongodb.net/database\n" +
-                "• With Options: mongodb://host:port/database?retryWrites=true&w=majority");
+                "• With Options: mongodb://host:port/database?retryWrites=true&w=majority\n" +
+                "• With Auth Mechanism: mongodb://user:pass@host:port/db?authMechanism=SCRAM-SHA-256\n\n" +
+                "💡 If you get SCRAM-SHA-1 errors, try SCRAM-SHA-256 or MONGODB-CR");
             
             // Database Name
             var lbl2 = new Label 
@@ -213,17 +134,17 @@ namespace MongoDbTools
                 Text = "Database Name:", 
                 Location = new System.Drawing.Point(15, 130), 
                 Size = new System.Drawing.Size(120, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtBackupDatabaseName = new TextBox 
             { 
                 Location = new System.Drawing.Point(15, 150), 
                 Size = new System.Drawing.Size(200, 22),
-                BackColor = System.Drawing.Color.White,
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new System.Drawing.Font("Segoe UI", 9)
+                BackColor = System.Drawing.SystemColors.Window,
+                ForeColor = System.Drawing.SystemColors.WindowText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
             };
             
             // Add tooltip for database name
@@ -234,36 +155,67 @@ namespace MongoDbTools
                 "• user_management\n" +
                 "• jobpxa");
             
+            // Authentication Mechanism
+            var lblAuth = new Label 
+            { 
+                Text = "Auth Mechanism:", 
+                Location = new System.Drawing.Point(230, 130), 
+                Size = new System.Drawing.Size(100, 16),
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
+            };
+            cmbBackupAuthMechanism = new ComboBox 
+            { 
+                Location = new System.Drawing.Point(230, 150), 
+                Size = new System.Drawing.Size(150, 22),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = System.Drawing.SystemColors.Window,
+                ForeColor = System.Drawing.SystemColors.WindowText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
+            };
+            cmbBackupAuthMechanism.Items.AddRange(new string[] { "Auto", "SCRAM-SHA-1", "SCRAM-SHA-256", "MONGODB-CR", "PLAIN", "GSSAPI", "MONGODB-X509" });
+            cmbBackupAuthMechanism.SelectedIndex = 0; // Auto
+            
+            // Add tooltip for auth mechanism
+            toolTip.SetToolTip(cmbBackupAuthMechanism, 
+                "Authentication Mechanism:\n" +
+                "• Auto: Let MongoDB driver choose\n" +
+                "• SCRAM-SHA-1: Default for MongoDB 3.0+\n" +
+                "• SCRAM-SHA-256: More secure, MongoDB 4.0+\n" +
+                "• MONGODB-CR: Legacy authentication\n" +
+                "• PLAIN: LDAP authentication\n" +
+                "• GSSAPI: Kerberos authentication\n" +
+                "• MONGODB-X509: Certificate authentication");
+            
             // Backup Folder
             var lbl3 = new Label 
             { 
                 Text = "Backup Folder:", 
                 Location = new System.Drawing.Point(15, 185), 
                 Size = new System.Drawing.Size(120, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtBackupFolder = new TextBox 
             { 
                 Location = new System.Drawing.Point(15, 205), 
                 Size = new System.Drawing.Size(620, 22), 
                 ReadOnly = true,
-                BackColor = System.Drawing.Color.FromArgb(248, 248, 248),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new System.Drawing.Font("Segoe UI", 9)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
             };
             btnSelectBackupFolder = new Button 
             { 
-                Text = "Browse", 
+                Text = "Browse...", 
                 Location = new System.Drawing.Point(645, 203), 
                 Size = new System.Drawing.Size(70, 26),
-                BackColor = System.Drawing.Color.FromArgb(0, 120, 215),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 8, System.Drawing.FontStyle.Regular)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                FlatStyle = FlatStyle.Standard,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
-            btnSelectBackupFolder.FlatAppearance.BorderSize = 0;
             btnSelectBackupFolder.Click += (s, e) => {
                 using (var dlg = new FolderBrowserDialog())
                     if (dlg.ShowDialog() == DialogResult.OK) txtBackupFolder.Text = dlg.SelectedPath;
@@ -275,12 +227,11 @@ namespace MongoDbTools
                 Text = "Test Connection", 
                 Location = new System.Drawing.Point(15, 245), 
                 Size = new System.Drawing.Size(120, 30), 
-                BackColor = System.Drawing.Color.FromArgb(0, 120, 215),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                FlatStyle = FlatStyle.Standard,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
-            btnTestBackupConnection.FlatAppearance.BorderSize = 0;
             btnTestBackupConnection.Click += BtnTestBackupConnection_Click;
             
             // Backup Button
@@ -289,12 +240,11 @@ namespace MongoDbTools
                 Text = "Start Backup", 
                 Location = new System.Drawing.Point(145, 245), 
                 Size = new System.Drawing.Size(120, 30), 
-                BackColor = System.Drawing.Color.FromArgb(40, 167, 69),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                FlatStyle = FlatStyle.Standard,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
-            btnBackup.FlatAppearance.BorderSize = 0;
             btnBackup.Click += BtnBackup_Click;
             
             // Progress & Status
@@ -309,8 +259,8 @@ namespace MongoDbTools
                 Text = "Ready to backup", 
                 Location = new System.Drawing.Point(15, 315), 
                 Size = new System.Drawing.Size(720, 18),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
             };
             
             // Log
@@ -319,8 +269,8 @@ namespace MongoDbTools
                 Text = "Activity Log:", 
                 Location = new System.Drawing.Point(15, 345), 
                 Size = new System.Drawing.Size(100, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtLogBackup = new TextBox 
             { 
@@ -329,28 +279,29 @@ namespace MongoDbTools
                 Multiline = true, 
                 ScrollBars = ScrollBars.Vertical, 
                 ReadOnly = true, 
-                Font = new System.Drawing.Font("Consolas", 8),
-                BackColor = System.Drawing.Color.FromArgb(248, 248, 248),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle
+                Font = new System.Drawing.Font("Courier New", 8.25F),
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                BorderStyle = BorderStyle.Fixed3D
             };
             
             // Add to tab
-            tabBackup.Controls.AddRange(new Control[] { headerPanel, lbl1, txtBackupConnectionString, lbl2, txtBackupDatabaseName, lbl3, txtBackupFolder, btnSelectBackupFolder, btnTestBackupConnection, btnBackup, progressBarBackup, lblStatusBackup, lbl4, txtLogBackup });
+            tabBackup.Controls.AddRange(new Control[] { headerPanel, lbl1, txtBackupConnectionString, lbl2, txtBackupDatabaseName, lblAuth, cmbBackupAuthMechanism, lbl3, txtBackupFolder, btnSelectBackupFolder, btnTestBackupConnection, btnBackup, progressBarBackup, lblStatusBackup, lbl4, txtLogBackup });
             tabControl.TabPages.Add(tabBackup);
         }
 
         private void CreateRestoreTab()
         {
             tabRestore = new TabPage("Restore Database");
-            tabRestore.BackColor = System.Drawing.Color.FromArgb(255, 255, 255);
+            tabRestore.BackColor = System.Drawing.SystemColors.Control;
             
             // Header Panel
             var headerPanel = new Panel
             {
                 Location = new System.Drawing.Point(15, 15),
                 Size = new System.Drawing.Size(950, 28),
-                BackColor = System.Drawing.Color.FromArgb(220, 53, 69)
+                BackColor = System.Drawing.SystemColors.ActiveCaption,
+                BorderStyle = BorderStyle.Fixed3D
             };
             
             var headerLabel = new Label
@@ -358,8 +309,8 @@ namespace MongoDbTools
                 Text = "Restore MongoDB Database",
                 Location = new System.Drawing.Point(12, 6),
                 Size = new System.Drawing.Size(400, 16),
-                ForeColor = System.Drawing.Color.White,
-                Font = new System.Drawing.Font("Segoe UI", 10, System.Drawing.FontStyle.Regular),
+                ForeColor = System.Drawing.SystemColors.ActiveCaptionText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Bold),
                 BackColor = System.Drawing.Color.Transparent
             };
             headerPanel.Controls.Add(headerLabel);
@@ -370,8 +321,8 @@ namespace MongoDbTools
                 Text = "Connection String:", 
                 Location = new System.Drawing.Point(15, 55), 
                 Size = new System.Drawing.Size(120, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtRestoreConnectionString = new TextBox 
             { 
@@ -379,10 +330,10 @@ namespace MongoDbTools
                 Size = new System.Drawing.Size(720, 20), 
                 Multiline = true, 
                 Height = 40,
-                BackColor = System.Drawing.Color.White,
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new System.Drawing.Font("Consolas", 8)
+                BackColor = System.Drawing.SystemColors.Window,
+                ForeColor = System.Drawing.SystemColors.WindowText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Font = new System.Drawing.Font("Courier New", 8.25F)
             };
             
             // Add tooltip for connection string format
@@ -392,7 +343,9 @@ namespace MongoDbTools
                 "• Local: mongodb://localhost:27017\n" +
                 "• With Auth: mongodb://username:password@host:port/database\n" +
                 "• Atlas: mongodb+srv://username:password@cluster.mongodb.net/database\n" +
-                "• With Options: mongodb://host:port/database?retryWrites=true&w=majority");
+                "• With Options: mongodb://host:port/database?retryWrites=true&w=majority\n" +
+                "• With Auth Mechanism: mongodb://user:pass@host:port/db?authMechanism=SCRAM-SHA-256\n\n" +
+                "💡 If you get SCRAM-SHA-1 errors, try SCRAM-SHA-256 or MONGODB-CR");
             
             // Database Name
             var lbl2 = new Label 
@@ -400,17 +353,17 @@ namespace MongoDbTools
                 Text = "Database Name:", 
                 Location = new System.Drawing.Point(15, 130), 
                 Size = new System.Drawing.Size(120, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtRestoreDatabaseName = new TextBox 
             { 
                 Location = new System.Drawing.Point(15, 150), 
                 Size = new System.Drawing.Size(200, 22),
-                BackColor = System.Drawing.Color.White,
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new System.Drawing.Font("Segoe UI", 9)
+                BackColor = System.Drawing.SystemColors.Window,
+                ForeColor = System.Drawing.SystemColors.WindowText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
             };
             
             // Add tooltip for database name
@@ -421,36 +374,67 @@ namespace MongoDbTools
                 "• user_management\n" +
                 "• jobpxa");
             
+            // Authentication Mechanism
+            var lblAuthRestore = new Label 
+            { 
+                Text = "Auth Mechanism:", 
+                Location = new System.Drawing.Point(230, 130), 
+                Size = new System.Drawing.Size(100, 16),
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
+            };
+            cmbRestoreAuthMechanism = new ComboBox 
+            { 
+                Location = new System.Drawing.Point(230, 150), 
+                Size = new System.Drawing.Size(150, 22),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = System.Drawing.SystemColors.Window,
+                ForeColor = System.Drawing.SystemColors.WindowText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
+            };
+            cmbRestoreAuthMechanism.Items.AddRange(new string[] { "Auto", "SCRAM-SHA-1", "SCRAM-SHA-256", "MONGODB-CR", "PLAIN", "GSSAPI", "MONGODB-X509" });
+            cmbRestoreAuthMechanism.SelectedIndex = 0; // Auto
+            
+            // Add tooltip for auth mechanism
+            toolTipRestore.SetToolTip(cmbRestoreAuthMechanism, 
+                "Authentication Mechanism:\n" +
+                "• Auto: Let MongoDB driver choose\n" +
+                "• SCRAM-SHA-1: Default for MongoDB 3.0+\n" +
+                "• SCRAM-SHA-256: More secure, MongoDB 4.0+\n" +
+                "• MONGODB-CR: Legacy authentication\n" +
+                "• PLAIN: LDAP authentication\n" +
+                "• GSSAPI: Kerberos authentication\n" +
+                "• MONGODB-X509: Certificate authentication");
+            
             // Restore Folder
             var lbl3 = new Label 
             { 
                 Text = "Backup Folder:", 
                 Location = new System.Drawing.Point(15, 185), 
                 Size = new System.Drawing.Size(120, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtRestoreFolder = new TextBox 
             { 
                 Location = new System.Drawing.Point(15, 205), 
                 Size = new System.Drawing.Size(620, 22), 
                 ReadOnly = true,
-                BackColor = System.Drawing.Color.FromArgb(248, 248, 248),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle,
-                Font = new System.Drawing.Font("Segoe UI", 9)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                BorderStyle = BorderStyle.Fixed3D,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
             };
             btnSelectRestoreFolder = new Button 
             { 
-                Text = "Browse", 
+                Text = "Browse...", 
                 Location = new System.Drawing.Point(645, 203), 
                 Size = new System.Drawing.Size(70, 26),
-                BackColor = System.Drawing.Color.FromArgb(220, 53, 69),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 8, System.Drawing.FontStyle.Regular)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                FlatStyle = FlatStyle.Standard,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
-            btnSelectRestoreFolder.FlatAppearance.BorderSize = 0;
             btnSelectRestoreFolder.Click += (s, e) => {
                 using (var dlg = new FolderBrowserDialog())
                     if (dlg.ShowDialog() == DialogResult.OK) txtRestoreFolder.Text = dlg.SelectedPath;
@@ -463,8 +447,8 @@ namespace MongoDbTools
                 Location = new System.Drawing.Point(15, 240), 
                 Size = new System.Drawing.Size(350, 20), 
                 Checked = false,
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular),
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular),
                 BackColor = System.Drawing.Color.Transparent
             };
             
@@ -474,12 +458,11 @@ namespace MongoDbTools
                 Text = "Test Connection", 
                 Location = new System.Drawing.Point(15, 270), 
                 Size = new System.Drawing.Size(120, 30), 
-                BackColor = System.Drawing.Color.FromArgb(0, 120, 215),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                FlatStyle = FlatStyle.Standard,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
-            btnTestRestoreConnection.FlatAppearance.BorderSize = 0;
             btnTestRestoreConnection.Click += BtnTestRestoreConnection_Click;
             
             // Restore Button
@@ -488,12 +471,11 @@ namespace MongoDbTools
                 Text = "Start Restore", 
                 Location = new System.Drawing.Point(145, 270), 
                 Size = new System.Drawing.Size(120, 30), 
-                BackColor = System.Drawing.Color.FromArgb(220, 53, 69),
-                ForeColor = System.Drawing.Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                FlatStyle = FlatStyle.Standard,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
-            btnRestore.FlatAppearance.BorderSize = 0;
             btnRestore.Click += BtnRestore_Click;
             
             // Progress & Status
@@ -508,8 +490,8 @@ namespace MongoDbTools
                 Text = "Ready to restore", 
                 Location = new System.Drawing.Point(15, 340), 
                 Size = new System.Drawing.Size(720, 18),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F)
             };
             
             // Log
@@ -518,8 +500,8 @@ namespace MongoDbTools
                 Text = "Activity Log:", 
                 Location = new System.Drawing.Point(15, 370), 
                 Size = new System.Drawing.Size(100, 16),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                Font = new System.Drawing.Font("Segoe UI", 9, System.Drawing.FontStyle.Regular)
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                Font = new System.Drawing.Font("Tahoma", 8.25F, System.Drawing.FontStyle.Regular)
             };
             txtLogRestore = new TextBox 
             { 
@@ -528,14 +510,14 @@ namespace MongoDbTools
                 Multiline = true, 
                 ScrollBars = ScrollBars.Vertical, 
                 ReadOnly = true, 
-                Font = new System.Drawing.Font("Consolas", 8),
-                BackColor = System.Drawing.Color.FromArgb(248, 248, 248),
-                ForeColor = System.Drawing.Color.FromArgb(64, 64, 64),
-                BorderStyle = BorderStyle.FixedSingle
+                Font = new System.Drawing.Font("Courier New", 8.25F),
+                BackColor = System.Drawing.SystemColors.Control,
+                ForeColor = System.Drawing.SystemColors.ControlText,
+                BorderStyle = BorderStyle.Fixed3D
             };
             
             // Add to tab
-            tabRestore.Controls.AddRange(new Control[] { headerPanel, lbl1, txtRestoreConnectionString, lbl2, txtRestoreDatabaseName, lbl3, txtRestoreFolder, btnSelectRestoreFolder, chkDropExisting, btnTestRestoreConnection, btnRestore, progressBarRestore, lblStatusRestore, lbl4, txtLogRestore });
+            tabRestore.Controls.AddRange(new Control[] { headerPanel, lbl1, txtRestoreConnectionString, lbl2, txtRestoreDatabaseName, lblAuthRestore, cmbRestoreAuthMechanism, lbl3, txtRestoreFolder, btnSelectRestoreFolder, chkDropExisting, btnTestRestoreConnection, btnRestore, progressBarRestore, lblStatusRestore, lbl4, txtLogRestore });
             tabControl.TabPages.Add(tabRestore);
         }
 
@@ -600,6 +582,16 @@ namespace MongoDbTools
             }
         }
 
+        private string BuildConnectionStringWithAuth(string baseConnectionString, ComboBox authComboBox)
+        {
+            if (authComboBox.SelectedIndex == 0) // Auto
+                return baseConnectionString;
+
+            var authMechanism = authComboBox.SelectedItem.ToString();
+            var separator = baseConnectionString.Contains("?") ? "&" : "?";
+            return $"{baseConnectionString}{separator}authMechanism={authMechanism}";
+        }
+
         private async void BtnTestBackupConnection_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtBackupConnectionString.Text))
@@ -614,19 +606,25 @@ namespace MongoDbTools
 
             try
             {
-                var client = new MongoClient(txtBackupConnectionString.Text.Trim());
+                var connectionString = BuildConnectionStringWithAuth(txtBackupConnectionString.Text.Trim(), cmbBackupAuthMechanism);
+                var client = new MongoClient(connectionString);
                 await client.ListDatabaseNamesAsync();
                 
                 MessageBox.Show("Connection successful!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 lblStatusBackup.Text = "✅ Connection successful!";
-                LogMessageBackup("Connection test successful");
+                LogMessageBackup($"Connection test successful using auth mechanism: {cmbBackupAuthMechanism.SelectedItem}");
                 
                 // Save connection string on successful test
                 SaveConnectionStrings();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Connection failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var errorMessage = ex.Message;
+                if (errorMessage.Contains("SCRAM-SHA-1"))
+                {
+                    errorMessage += "\n\n💡 Try using 'SCRAM-SHA-256' or 'MONGODB-CR' authentication mechanism instead.";
+                }
+                MessageBox.Show($"Connection failed: {errorMessage}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 lblStatusBackup.Text = "❌ Connection failed!";
                 LogMessageBackup($"Connection test failed: {ex.Message}");
             }
@@ -687,19 +685,25 @@ namespace MongoDbTools
 
             try
             {
-                var client = new MongoClient(txtRestoreConnectionString.Text.Trim());
+                var connectionString = BuildConnectionStringWithAuth(txtRestoreConnectionString.Text.Trim(), cmbRestoreAuthMechanism);
+                var client = new MongoClient(connectionString);
                 await client.ListDatabaseNamesAsync();
                 
                 MessageBox.Show("Connection successful!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 lblStatusRestore.Text = "✅ Connection successful!";
-                LogMessageRestore("Connection test successful");
+                LogMessageRestore($"Connection test successful using auth mechanism: {cmbRestoreAuthMechanism.SelectedItem}");
                 
                 // Save connection string on successful test
                 SaveConnectionStrings();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Connection failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var errorMessage = ex.Message;
+                if (errorMessage.Contains("SCRAM-SHA-1"))
+                {
+                    errorMessage += "\n\n💡 Try using 'SCRAM-SHA-256' or 'MONGODB-CR' authentication mechanism instead.";
+                }
+                MessageBox.Show($"Connection failed: {errorMessage}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 lblStatusRestore.Text = "❌ Connection failed!";
                 LogMessageRestore($"Connection test failed: {ex.Message}");
             }
@@ -754,7 +758,8 @@ namespace MongoDbTools
 
         private async Task PerformBackup()
         {
-            var client = new MongoClient(txtBackupConnectionString.Text.Trim());
+            var connectionString = BuildConnectionStringWithAuth(txtBackupConnectionString.Text.Trim(), cmbBackupAuthMechanism);
+            var client = new MongoClient(connectionString);
             var database = client.GetDatabase(txtBackupDatabaseName.Text.Trim());
             var backupFolder = txtBackupFolder.Text.Trim();
 
@@ -794,7 +799,8 @@ namespace MongoDbTools
 
         private async Task PerformRestore()
         {
-            var client = new MongoClient(txtRestoreConnectionString.Text.Trim());
+            var connectionString = BuildConnectionStringWithAuth(txtRestoreConnectionString.Text.Trim(), cmbRestoreAuthMechanism);
+            var client = new MongoClient(connectionString);
             var database = client.GetDatabase(txtRestoreDatabaseName.Text.Trim());
             var backupFolder = txtRestoreFolder.Text.Trim();
 
